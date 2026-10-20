@@ -8,9 +8,11 @@ Color-tag your sessions from the sidebar.
 
 ## What it does
 
+- **Sidebar panel** — a new entry beside *Plugins* and *Automation tasks* in the left rail. It lists every tagged session and doubles as the tag palette: click a tag to filter the list, click again to clear.
 - **Idle session rows** show a colored pie in the leading cell — one equal slice per tag, so one tag reads as a solid dot and several as a color wheel. Past four tags the rest fold into one gray slice.
 - **Hover card** lists every tag of the session as a colored chip, between the relative time and the status lines. Past three tags the rest fold into a single "+N" chip.
 - **Session "···" menu** carries one toggle row per tag (a `✓` marks the assigned ones) plus a *Manage tags…* entry that opens the palette dialog.
+- **Ctrl+P** opens a VSCode-style quick-jump box over the **tagged sessions only**: type to filter by session title or tag name, ↑↓ to move, Enter to jump, Esc to close.
 - **Settings → Plugins → Session tags** is the full palette manager: rename, recolor, add, and delete tags. Every edit saves immediately.
 
 Tags ship with three starters (Important / In progress / Todo) that you can rename, recolor, or delete.
@@ -19,6 +21,9 @@ Tags ship with three starters (Important / In progress / Todo) that you can rena
 
 | Surface | Slot | Props received |
 | --- | --- | --- |
+| Sidebar rail icon | `sidebar.panellist` | `{ size }` |
+| Tag panel page | `main` (key `session-tag`) | locale seat + `useSessions` |
+| Ctrl+P quick-jump layer | `shell.overlay` | locale seat + `useSessions` |
 | Row leading pie | `sidebar.session.row.leading` | `{ sessionId }` |
 | Hover-card chips | `sidebar.session.row.hover` | `{ sessionId }` |
 | Session menu rows | `sidebar.workspaces.session.menu.item` | `{ sessionId, displayTitle, useMenuOpenState }` |
@@ -30,13 +35,13 @@ All four session-row slots are additive list slots (`replaceRisk: none`), so the
 ## Install
 
 ```sh
-dsh plugin --profile <name> add <path-or-spec>
+dsh plugin --profile <name> add github:liugangnhm/dsh-session-tag
 ```
 
-For a GitHub source:
+For a local checkout:
 
 ```sh
-dsh plugin --profile <name> add github:<owner>/dsh-session-tag
+dsh plugin --profile <name> add <path-to-this-package>
 ```
 
 Restart the profile (or reload the web page) afterwards. The host half is intentionally empty; every surface is the browser half, discovered through the package's `dsh.client` declaration.

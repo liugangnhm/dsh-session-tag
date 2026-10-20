@@ -8,9 +8,11 @@
 
 ## 功能
 
+- **侧边栏面板**：左侧栏在“插件”“自动化任务”旁新增一个入口。面板列出全部已打标签的会话，同时就是标签筛选器——点标签筛选列表，再点一次清除。
 - **空闲会话行**：前导格显示彩色饼图——每个标签一个等大扇区，单标签读作实心圆点，多标签读作色轮；超过四个标签时其余折入一个灰色扇区。
 - **悬停卡**：在相对时间与状态行之间，以彩色芯片列出该会话的全部标签；超过三个标签时其余折入一个 "+N" 芯片。
 - **会话“···”菜单**：每个标签一行切换项（已打标的显示 `✓`），另有“管理标签…”入口打开标签管理弹窗。
+- **Ctrl+P**：弹出 VSCode 风格的快速跳转框，候选**仅限已打标签的会话**——输入按会话标题或标签名筛选，↑↓ 移动，Enter 跳转，Esc 关闭。
 - **设置 → 插件 → 会话标签**：完整的标签管理页——重命名、改色、新增、删除，即时保存。
 
 内置三个起始标签（重要 / 进行中 / 待办），可随意改名、改色或删除。
@@ -19,6 +21,9 @@
 
 | 界面 | Slot | 收到的 props |
 | --- | --- | --- |
+| 侧边栏栏位图标 | `sidebar.panellist` | `{ size }` |
+| 标签面板页 | `main`（key `session-tag`） | locale 席位 + `useSessions` |
+| Ctrl+P 快速跳转层 | `shell.overlay` | locale 席位 + `useSessions` |
 | 行前导饼图 | `sidebar.session.row.leading` | `{ sessionId }` |
 | 悬停卡芯片 | `sidebar.session.row.hover` | `{ sessionId }` |
 | 会话菜单项 | `sidebar.workspaces.session.menu.item` | `{ sessionId, displayTitle, useMenuOpenState }` |
@@ -30,13 +35,13 @@
 ## 安装
 
 ```sh
-dsh plugin --profile <名称> add <路径或规格>
+dsh plugin --profile <名称> add github:liugangnhm/dsh-session-tag
 ```
 
-从 GitHub 源安装：
+本地检出：
 
 ```sh
-dsh plugin --profile <名称> add github:<owner>/dsh-session-tag
+dsh plugin --profile <名称> add <本包路径>
 ```
 
 安装后重启该 profile（或刷新网页）生效。host 半区故意为空；全部界面由浏览器半区提供，通过包的 `dsh.client` 声明被发现。

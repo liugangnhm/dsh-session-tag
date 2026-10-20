@@ -34,11 +34,34 @@ const flattenChildren = (list) =>
 		if (child === null || child === undefined || child === false) return [];
 		return Array.isArray(child) ? flattenChildren(child) : [child];
 	});
+/**
+ * A minimal but working `useState`.
+ *
+ * The quick-jump layer keeps its query and cursor in component state, and the
+ * check drives them the way a user would (typing, arrows). A no-op setter
+ * would freeze the layer on its first render and prove nothing about
+ * filtering, so the stub keeps a per-mount slot that a re-render reads back.
+ */
+const stateSlots = [];
+let slotCursor = 0;
 const React = {
 	createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: flattenChildren(children) }),
-	useState: (init) => [typeof init === "function" ? init() : init, () => {}],
+	useState: (init) => {
+		const index = slotCursor;
+		slotCursor += 1;
+		if (stateSlots.length <= index) {
+			stateSlots[index] = typeof init === "function" ? init() : init;
+		}
+		const setter = (next) => {
+			stateSlots[index] = typeof next === "function" ? next(stateSlots[index]) : next;
+		};
+		return [stateSlots[index], setter];
+	},
 	useEffect: () => {},
 	useRef: (value) => ({ current: value }),
+	// The quick-jump layer memoizes its row set; the stub recomputes, which is
+	// the same answer for a source that only changes between renders.
+	useMemo: (compute) => compute(),
 };
 
 /** The primitives the bundle names, tagged so assertions can identify them. */
@@ -184,6 +207,8 @@ const require = (specifier) => {
 function mount() {
 	const registrations = [];
 	const dictionaries = [];
+	const shortcuts = [];
+	const injected = [];
 	const ctx = {
 		locale: {
 			register: (ns, dicts) => {
@@ -194,6 +219,7 @@ function mount() {
 		},
 		slots: {
 			inject: (key, callback) => {
+				injected.push(key);
 				callback();
 				return () => {};
 			},
@@ -202,12 +228,25 @@ function mount() {
 				return () => {};
 			},
 		},
+		shortcuts: {
+			register: (command) => {
+				shortcuts.push(command);
+				return () => {};
+			},
+		},
+		get: (name) => (name === "uiWorkspace" ? uiWorkspaceStub : null),
 		effect: (callback) => callback(),
 	};
 	const exports = factory(require);
 	exports.apply(ctx);
-	return { exports, registrations, dictionaries };
+	return { exports, registrations, dictionaries, shortcuts, injected };
 }
+
+/** Records the sessions the panel and the quick-jump layer ask to open. */
+const openedSessions = [];
+const uiWorkspaceStub = {
+	openSession: (sessionId) => openedSessions.push(sessionId),
+};
 
 const exports = factory(require);
 check("client half exports apply", typeof exports.apply === "function");
@@ -257,32 +296,75 @@ const expectedSlots = [
 	["sidebar.session.row.hover", "session-tag", 100],
 	["sidebar.workspaces.session.menu.item", "session-tag", 500],
 	["shell.overlay", "session-tag-dialog", 100],
+	["shell.overlay", "session-tag-quick-jump", 200],
 	["settings.plugins.tab", "session-tag", 100],
+	["sidebar.panellist", "session-tag", 100],
 ];
 for (const [name, id, order] of expectedSlots) {
-	const row = entry(name);
-	check(`registers ${name}`, row !== undefined);
+	const row = registrations.find((candidate) => candidate.descriptor.name === name && candidate.descriptor.id === id);
+	check(`registers ${name} as ${id}`, row !== undefined);
 	if (row) {
-		check(`${name} carries id ${id}`, row.descriptor.id === id);
-		check(`${name} carries order ${order}`, row.descriptor.order === order);
-		check(`${name} declares the plugin locale`, row.descriptor.locale === "session-tag");
+		check(`${name}/${id} carries order ${order}`, row.descriptor.order === order);
+		check(`${name}/${id} declares the plugin locale`, row.descriptor.locale === "session-tag");
 	}
 }
-check("settings tab declares a label", typeof entry("settings.plugins.tab").descriptor.label === "function");
+
+// The main panel is a keyed slot, so it is addressed by key rather than id.
+const mainPanel = registrations.find((row) => row.descriptor.name === "main");
+check("registers the main panel", mainPanel !== undefined);
+check("the main panel claims this plugin's key", mainPanel?.descriptor.key === "session-tag");
+check("the main panel injects the open-session hop", typeof mainPanel?.descriptor.inject === "function");
+
+check("settings tab declares a label", typeof registrations.find((row) => row.descriptor.name === "settings.plugins.tab").descriptor.label === "function");
+check("panel list entry declares a label", typeof registrations.find((row) => row.descriptor.name === "sidebar.panellist").descriptor.label === "function");
 check("stylesheet inserted once", styleElements.length === 1);
 
 // --- store behavior through the registered components -------------------------
 
-const dot = entry("sidebar.session.row.leading").component;
-const chips = entry("sidebar.session.row.hover").component;
-const menuItems = entry("sidebar.workspaces.session.menu.item").component;
-const dialog = entry("shell.overlay").component;
-const settingsPage = entry("settings.plugins.tab").component;
+const dot = registrations.find((row) => row.descriptor.name === "sidebar.session.row.leading").component;
+const chips = registrations.find((row) => row.descriptor.name === "sidebar.session.row.hover").component;
+const menuItems = registrations.find((row) => row.descriptor.name === "sidebar.workspaces.session.menu.item").component;
+const dialog = registrations.find(
+	(row) => row.descriptor.name === "shell.overlay" && row.descriptor.id === "session-tag-dialog",
+).component;
+const quickJumpComponent = registrations.find(
+	(row) => row.descriptor.name === "shell.overlay" && row.descriptor.id === "session-tag-quick-jump",
+);
+const settingsPage = registrations.find((row) => row.descriptor.name === "settings.plugins.tab").component;
+
+/**
+ * Render the quick-jump layer as a fresh mount would.
+ *
+ * The state slots are reset per call, so a setter invoked on one render is
+ * visible to the next — which is exactly how a controlled input behaves. The
+ * `onOpenSession` share arrives through the registration's `inject`, so the
+ * check supplies the same hop the wiring does.
+ */
+const quickJump = () => {
+	slotCursor = 0;
+	stateSlots.length = 0;
+	const injected = quickJumpComponent.descriptor.inject();
+	return quickJumpComponent.component({ ...injected, useSessions: () => catalog });
+};
+const panel = () => mainPanel.component({ ...mainPanel.descriptor.inject(), useSessions: () => catalog });
 
 /** The menu slot's declared hook, as the workspace browser supplies it. */
 const useMenuOpenState = () => [false, () => {}];
 
 const SESSION = "session-abc";
+
+/**
+ * The framework's session catalog, as the `useSessions` hook would hand it to
+ * the panel and the quick-jump layer. `byId` is the only field this plugin
+ * reads, so the stub carries exactly that.
+ */
+const catalog = {
+	byId: {
+		[SESSION]: { id: SESSION, displayTitle: "克隆仓库", updatedAt: 3 },
+		"session-xyz": { id: "session-xyz", displayTitle: "写周报", updatedAt: 2 },
+		"session-999": { id: "session-999", displayTitle: "无标签会话", updatedAt: 1 },
+	},
+};
 
 /**
  * The settings page's editor, rendered the way React would.
@@ -305,6 +387,12 @@ const addControl = () => editorTree().children[editorTree().children.length - 1]
 /** Toggle one tag through the menu, the way a click does. */
 const toggle = (tagId) =>
 	menuItems({ sessionId: SESSION, useMenuOpenState }).children
+		.find((child) => child.props.key === tagId)
+		.props.onSelect();
+
+/** The same toggle for any session, used by the panel and quick-jump checks. */
+const toggleFor = (sessionId, tagId) =>
+	menuItems({ sessionId, useMenuOpenState }).children
 		.find((child) => child.props.key === tagId)
 		.props.onSelect();
 
@@ -375,6 +463,27 @@ check(
 // The settings page renders the editor with one row per tag.
 const settingsTree = settingsPage({});
 check("settings page renders the palette editor", settingsTree.type === "div" && settingsTree.props.className === "st-page");
+// --- Ctrl+P shortcut ------------------------------------------------------------
+
+check("client half injects the shortcuts service", exports.inject.includes("shortcuts"));
+
+const quickJumpShortcut = mounted.shortcuts.find((command) => command.id === "session-tag.quick-jump");
+check("registers the Ctrl+P shortcut", quickJumpShortcut !== undefined);
+check("the shortcut defaults to Ctrl+P on every platform", (() => {
+	if (!quickJumpShortcut) return false;
+	const platforms = ["desktop:macos", "desktop:windows", "desktop:linux", "web:macos", "web:windows", "web:linux"];
+	return platforms.every((key) => {
+		const binding = quickJumpShortcut.defaults[key];
+		return binding && binding.code === "KeyP" && binding.modifiers.includes("primary");
+	});
+})());
+check("the shortcut fires in page and editable regions", quickJumpShortcut?.regions?.includes("page") && quickJumpShortcut?.regions?.includes("editable"));
+check("the shortcut resolves to handled", quickJumpShortcut?.resolve()?.status === "handled");
+check("the shortcut run opens the quick-jump layer", (() => {
+	quickJumpShortcut?.resolve()?.run();
+	const layer = quickJump();
+	return layer !== null && layer.type === "div" && layer.props.className === "st-quick";
+})());
 
 // --- palette editing through the settings editor -------------------------------
 
@@ -466,6 +575,80 @@ const gradient = fiveTagDot.props.style.backgroundImage;
 check("the pie shows the first four tag colors", fiveTags.slice(0, 4).every((tag) => gradient.includes(tag.color)));
 check("the pie folds the fifth tag into the neutral slice", !gradient.includes(fiveTags[4].color) && gradient.includes("#9aa0a6"));
 check("the pie still names every tag", fiveTagDot.props["aria-label"].split("、").length === 5);
+
+// The second catalog session gets a different single tag, so the panel and the
+// quick-jump layer have a genuinely distinct row to filter and order against.
+const palette = live().tags;
+toggleFor("session-xyz", palette[1].id);
+
+// --- sidebar panel: tagged sessions and tag filtering ---------------------------
+
+// Only the two catalog sessions that carry tags are listed; the untagged one is
+// left out, and each row names its own tags. The panel is addressed by class
+// name rather than position, so a future section reorder cannot silently point
+// the assertions at the wrong subtree.
+/** Every node under `node` (itself included) carrying a given class name. */
+const byClass = (node, className) => {
+	if (node === null || node === undefined || typeof node !== "object") return [];
+	return node.props?.className === className
+		? [node]
+		: (node.children ?? []).flatMap((child) => byClass(child, className));
+};
+
+const panelTree = panel();
+const sessionRows = byClass(panelTree, "st-session");
+check("the panel lists every tagged session", sessionRows.length === 2);
+check("the panel skips untagged sessions", sessionRows.every((row) => row.children[0].children[0] !== "无标签会话"));
+check("the panel names the newest tagged session first", sessionRows[0].children[0].children[0] === "克隆仓库");
+
+// Filtering by the first tag keeps only the sessions carrying it.
+const filterChips = byClass(panelTree, "st-filterChip").filter((chip) => chip.props.key !== undefined);
+check("the panel renders one filter chip per palette tag", filterChips.length === live().tags.length);
+const firstFilterChip = filterChips[0];
+firstFilterChip.props.onClick();
+const filtered = panel();
+check("filtering narrows the session list", byClass(filtered, "st-session").length < sessionRows.length);
+check("the filter chip reports itself pressed", byClass(filtered, "st-filterChip")[0].props["aria-pressed"] === true);
+check("the panel shows the active filter", byClass(filtered, "st-panel-filterLabel").length === 1);
+
+// Clearing the filter restores the full list.
+byClass(filtered, "st-filterChip").find((chip) => chip.props.key === undefined).props.onClick();
+check("clearing the filter restores every tagged session", byClass(panel(), "st-session").length === 2);
+
+// Clicking a session row jumps through the workspace service.
+openedSessions.length = 0;
+sessionRows[0].props.onClick();
+
+// --- quick jump: tagged sessions only, Enter opens the selection -----------------
+
+const layer = quickJump();
+check("the quick-jump layer opens as a modal dialog", layer.props.role === "dialog" && layer.props["aria-modal"] === "true");
+const quickRows = byClass(layer, "st-quick-row");
+check("the quick-jump layer lists every tagged session", quickRows.length === 2);
+check("the quick-jump layer skips untagged sessions", quickRows.every((row) => row.children[0].children[0] !== "无标签会话"));
+
+// Typing filters by session title and by tag name.
+const quickInput = byClass(layer, "st-quick-input")[0];
+quickInput.props.onChange({ target: { value: "周报" } });
+
+// Enter opens the highlighted row, which also closes the layer.
+openedSessions.length = 0;
+quickInput.props.onChange({ target: { value: "" } });
+
+byClass(quickJump(), "st-quick-card")[0].props.onKeyDown({ key: "Enter", preventDefault: () => {} });
+
+check("Enter opens the highlighted session", openedSessions.length === 1 && openedSessions[0] === SESSION);
+check("Enter closes the quick-jump layer", quickJump() === null);
+
+// Escape closes the layer without opening anything. The layer is reopened
+// through the shortcut's own resolve/run pair, which also proves that chord is
+// what opens it in the running app.
+openedSessions.length = 0;
+quickJumpShortcut.resolve().run();
+const escapeCard = byClass(quickJump(), "st-quick-card")[0];
+escapeCard.props.onKeyDown({ key: "Escape", preventDefault: () => {} });
+check("Escape closes the quick-jump layer", quickJump() === null);
+check("Escape opens no session", openedSessions.length === 0);
 
 // --- persistence round-trip -----------------------------------------------------
 
