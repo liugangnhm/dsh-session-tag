@@ -469,14 +469,40 @@ check("client half injects the shortcuts service", exports.inject.includes("shor
 
 const quickJumpShortcut = mounted.shortcuts.find((command) => command.id === "session-tag.quick-jump");
 check("registers the Ctrl+P shortcut", quickJumpShortcut !== undefined);
-check("the shortcut defaults to Ctrl+P on every platform", (() => {
+check("the desktop shortcut is the bare Ctrl+P on every platform", (() => {
 	if (!quickJumpShortcut) return false;
-	const platforms = ["desktop:macos", "desktop:windows", "desktop:linux", "web:macos", "web:windows", "web:linux"];
-	return platforms.every((key) => {
+	return ["desktop:macos", "desktop:windows", "desktop:linux"].every((key) => {
 		const binding = quickJumpShortcut.defaults[key];
-		return binding && binding.code === "KeyP" && binding.modifiers.includes("primary");
+		return binding && binding.code === "KeyP" && binding.modifiers.length === 1 && binding.modifiers[0] === "primary";
 	});
 })());
+
+/**
+ * The Web runtime's admission rule, mirrored from the shortcuts service.
+ *
+ * `register` validates every runtime/platform pair before accepting a command,
+ * so one unsupported cell (the plain Web Ctrl+P) throws and leaves the plugin
+ * stuck in `loading`. This mirrors that rule so the suite catches a regression
+ * without a running shell.
+ */
+const webAllows = (code, modifiers, platform) => {
+	if (modifiers.length >= 3) return true;
+	const primary = platform === "macos" ? "meta" : "control";
+	const expanded = modifiers.map((value) => (value === "primary" ? primary : value));
+	if (expanded.length === 1 && ["Comma", "Backslash"].includes(code) && expanded[0] === primary) return true;
+	if (expanded.length === 2 && expanded.includes(primary) && (expanded.includes("alt") || expanded.includes("shift"))) return true;
+	return false;
+};
+check("every bound Web default passes the Web admission rule", (() => {
+	if (!quickJumpShortcut) return false;
+	return ["web:macos", "web:windows"].every((key) => {
+		const binding = quickJumpShortcut.defaults[key];
+		if (!binding || binding.code !== "KeyP" || !binding.modifiers.includes("primary")) return false;
+		return webAllows(binding.code, binding.modifiers, key.split(":")[1]);
+	});
+})());
+check("Web-on-Linux is deliberately unbound", quickJumpShortcut?.defaults?.["web:linux"] === undefined);
+check("the bare Web Ctrl+P would be rejected, proving the shift is required", !webAllows("KeyP", ["primary"], "windows"));
 check("the shortcut fires in page and editable regions", quickJumpShortcut?.regions?.includes("page") && quickJumpShortcut?.regions?.includes("editable"));
 check("the shortcut resolves to handled", quickJumpShortcut?.resolve()?.status === "handled");
 check("the shortcut run opens the quick-jump layer", (() => {

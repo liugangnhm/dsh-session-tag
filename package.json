@@ -45,7 +45,7 @@
   },
   "homepage": "https://github.com/liugangnhm/dsh-session-tag#readme",
   "scripts": {
-    "test": "node test/client.test.mjs"
+    "test": "node test/client.test.mjs && node test/shortcut.test.mjs"
   },
   "keywords": [
     "deepseek",
