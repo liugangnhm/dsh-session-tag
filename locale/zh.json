@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "title": "会话标签",
+    "description": "为侧边栏会话添加彩色标签：空闲会话行前导格显示彩色圆点，悬停卡列出全部标签，会话“···”菜单内快速切换，设置页管理标签名称与颜色，数据保存在浏览器本地。"
+  },
+  "menu.manage": "管理标签…",
+  "dialog.title": "管理会话标签",
+  "dialog.close": "完成",
+  "dialog.hint": "在任意会话的“···”菜单里切换标签；空闲会话行的前导格会显示彩色圆点，悬停卡显示全部标签。",
+  "settings.title": "会话标签",
+  "settings.intro": "为会话添加彩色标签：在任意会话的“···”菜单中切换。空闲会话行前导格显示彩色圆点，悬停卡列出全部标签。数据保存在当前浏览器。",
+  "settings.add": "添加标签",
+  "settings.name": "名称",
+  "settings.color": "颜色",
+  "settings.delete": "删除该标签",
+  "settings.empty": "还没有标签，点击“添加标签”创建第一个。",
+  "settings.defaultName": "新标签",
+  "dot.label": "标签：{names}",
+  "hover.tags": "标签",
+  "seed.important": "重要",
+  "seed.active": "进行中",
+  "seed.todo": "待办"
+}

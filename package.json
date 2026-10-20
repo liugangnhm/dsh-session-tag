@@ -1,0 +1,60 @@
+{
+  "name": "dsh-session-tag",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tag sessions from the sidebar: a colored pie on idle session rows, tag chips in the hover card, quick toggle in the session \"...\" menu, and a palette manager in Settings → Plugins. Tags persist in the browser. · 会话标签插件：空闲会话行前导彩色饼图、悬停卡标签芯片、会话菜单内快速切换、设置页标签管理，数据保存在浏览器本地。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "lib",
+    "locale",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liugangnhm/dsh-session-tag.git"
+  },
+  "bugs": {
+    "url": "https://github.com/liugangnhm/dsh-session-tag/issues"
+  },
+  "homepage": "https://github.com/liugangnhm/dsh-session-tag#readme",
+  "scripts": {
+    "test": "node test/client.test.mjs"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "client-plugin",
+    "session-tag",
+    "label",
+    "sidebar"
+  ],
+  "license": "MIT"
+}

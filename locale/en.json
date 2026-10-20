@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "title": "Session tags",
+    "description": "Color-tag sidebar sessions: a colored dot on idle session rows, every tag in the hover card, quick toggles in the session \"···\" menu, and a palette manager in Settings. Data is stored in the browser."
+  },
+  "menu.manage": "Manage tags…",
+  "dialog.title": "Manage session tags",
+  "dialog.close": "Done",
+  "dialog.hint": "Toggle tags from any session's \"···\" menu. Idle session rows show a colored dot; the hover card lists every tag.",
+  "settings.title": "Session tags",
+  "settings.intro": "Color-tag your sessions: toggle tags from any session's \"···\" menu. Idle rows show a colored dot; the hover card lists every tag. Data is stored in this browser.",
+  "settings.add": "Add tag",
+  "settings.name": "Name",
+  "settings.color": "Color",
+  "settings.delete": "Delete this tag",
+  "settings.empty": "No tags yet — click “Add tag” to create the first one.",
+  "settings.defaultName": "New tag",
+  "dot.label": "Tags: {names}",
+  "hover.tags": "Tags",
+  "seed.important": "Important",
+  "seed.active": "In progress",
+  "seed.todo": "Todo"
+}
